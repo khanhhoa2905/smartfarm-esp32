@@ -399,7 +399,6 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    flowchart TD
     A[Start] --> B[Init Serial]
     B --> C[Init Actuators]
     C --> D[Init Sensors]
