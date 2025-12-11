@@ -502,23 +502,20 @@ flowchart TD
 
 ## 9. Hình ảnh & video minh hoạ
 
-.
+* ## 🖼️ Sơ đồ phần cứng
+![Hardware schematic](./KQ/sodophancung.jpg)
 
-* **Sơ đồ đấu nối phần cứng**
+## 🖼️ Mô hình thực tế
+![Model](./KQ/mohinh.jpg)
 
-  ![Hardware schematic](KQ\Sơ đồ kết nối phần cứng.jpg)
+## 🖼️ Giao diện Dashboard
+![Dashboard](./KQ/hethongdashboard.jpg)
 
-* **Giao diện Dashboard – môi trường & thiết bị**
+## 🖼️ Gửi Telegram
+![Telegram screenshot](./KQ/telegrambot.jpg)
 
-  ![Dashboard overview](docs/dashboard_overview.png)
-
-* **Tab Charts – các đồ thị thời gian thực**
-
-  ![Charts overview](docs/charts_overview.png)
-
-* **Video demo hệ thống:**
-
-  [▶ Xem video demo](docs/video_demo.mp4)
+## 🖼️ Gửi Email
+![Email screenshot](./KQ/email.jpg)
 
 ---
 
