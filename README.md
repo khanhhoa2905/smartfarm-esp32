@@ -561,5 +561,6 @@ Trong tương lai có thể mở rộng:
 * Liên hệ: *ngokhanhhoa_t67@hus.edu.vn*
 * 
 ![File schematic](./KQ/SmartFarm.fzz)
+
 Video demo kết quả
 *https://www.youtube.com/watch?si=gxS6UQZpydUrsvZz&v=JBjc2BafbaU&feature=youtu.be*
