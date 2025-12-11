@@ -399,23 +399,24 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    A[Start] --> B[Khởi tạo Serial]
-    B --> C[initActuators()]
-    C --> D[initSensors()]
-    D --> E[initRFID()]
-    E --> F[initWifiMQTT()]
-    F --> G{Kết nối WiFi & MQTT OK?}
+    flowchart TD
+    A[Start] --> B[Init Serial]
+    B --> C[Init Actuators]
+    C --> D[Init Sensors]
+    D --> E[Init RFID]
+    E --> F[Init WiFi MQTT]
+    F --> G{WiFi & MQTT OK?}
     G -- No --> F
-    G -- Yes --> H[Main loop]
+    G -- Yes --> H[Main Loop]
 
-    H --> I[ mqttLoop() ]
-    I --> J[ readSensors() ]
-    J --> K[ checkRFID() ]
-    K --> L[ runAutomation(data, cardUID) ]
-    L --> M{Đến chu kỳ gửi dữ liệu?}
+    H --> I[mqttLoop]
+    I --> J[readSensors]
+    J --> K[checkRFID]
+    K --> L[runAutomation]
+    L --> M{Time to publish?}
     M -- No --> I
-    M -- Yes --> N[Đóng gói JSON (data + trạng thái)]
-    N --> O[mqttPublish smartfarm/data]
+    M -- Yes --> N[Build JSON payload]
+    N --> O[Publish smartfarm/data]
     O --> I
 ```
 
@@ -423,28 +424,35 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A[Nhận SensorData d, cardUID] --> B{fire == true ?}
-    B -- Yes --> B1[Bật còi, bật bơm, dừng servo]
-    B1 --> B2[Publish 'Fire detected']
+     A[Input: SensorData + cardUID] --> B{Fire detected?}
+    B -- Yes --> B1[Turn ON Buzzer & Pump<br/>Stop Servo]
+    B1 --> B2[Publish Fire Alert]
     B2 --> C
-    B -- No --> B3[Tắt còi, tắt bơm, servo tiếp tục quét]
+    B -- No --> B3[Turn OFF Buzzer & Pump<br/>Servo sweep continue]
     B3 --> C
 
-    C{gas% > ngưỡng OR (temp > 35 & motion)} --> C1[Bật quạt] --> D
-    C -- No --> C2[Tắt quạt] --> D
+    C{Gas high OR Temp high with Motion?} --> C1[Turn ON Fan]
+    C --> C2[Turn OFF Fan]
+    C1 --> D
+    C2 --> D
 
-    D{soil% < 30 AND water% > 20} --> D1[Bật bơm tưới] --> E
-    D -- No --> D2[Tắt bơm] --> E
+    D{Soil dry AND Water OK?} --> D1[Turn ON Pump]
+    D --> D2[Turn OFF Pump]
+    D1 --> E
+    D2 --> E
 
-    E{motion == true AND light == tối} --> E1[Bật đèn] --> F
-    E -- No --> E2[Tắt đèn] --> F
+    E{Motion AND Dark?} --> E1[Turn ON Light]
+    E --> E2[Turn OFF Light]
+    E1 --> F
+    E2 --> F
 
-    F{cardUID != "" ?} -->|Yes| F1[Kiểm tra UID hợp lệ?]
-    F1 -- Hợp lệ --> F2[Log: Access OK]
-    F1 -- Sai --> F3[Log: Access Denied]
-    F2 --> G[Hoàn thành vòng lặp]
-    F3 --> G
-    F -- No --> G
+    F{RFID Scanned?} --> G1[Check UID]
+    F --> G[End Loop]
+
+    G1 -->|Valid| G2[Log Access OK]
+    G1 -->|Invalid| G3[Log Access Denied]
+    G2 --> G
+    G3 --> G
 ```
 
 ---
