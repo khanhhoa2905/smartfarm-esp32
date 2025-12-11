@@ -502,11 +502,19 @@ flowchart TD
 
 ## 9. Hình ảnh & video minh hoạ
 
-> Thay thế các đường dẫn bằng file thực tế của bạn trong thư mục `docs/`.
+.
 
 * **Sơ đồ đấu nối phần cứng**
 
-  ![Hardware schematic](docs/hardware_schematic.png)
+  ![Hardware schematic]("C:\Users\84868\OneDrive\Document\PlatformIO\Projects\SmartFarm_ESP32\KQ\z7317676609991_bffeeadc6c4615393bc068eedb650863.jpg"
+"C:\Users\84868\OneDrive\Document\PlatformIO\Projects\SmartFarm_ESP32\KQ\z7317689331859_de1aac6ba73aa96d3e048249d3885fe4.jpg"
+"C:\Users\84868\OneDrive\Document\PlatformIO\Projects\SmartFarm_ESP32\KQ\z7315079505617_1b726a31dab5fc506863389576d7ced1.jpg"
+"C:\Users\84868\OneDrive\Document\PlatformIO\Projects\SmartFarm_ESP32\KQ\z7317676607013_d380785f03b91c3534ddd6ca531b6708.jpg"
+"C:\Users\84868\OneDrive\Document\PlatformIO\Projects\SmartFarm_ESP32\KQ\z7317676607748_ad127ce40bb4ecd9e2c79af1a868c6c5.jpg"
+"C:\Users\84868\OneDrive\Document\PlatformIO\Projects\SmartFarm_ESP32\KQ\z7317676608886_f8b65321ef386844d63954d0b99aea45.jpg"
+"C:\Users\84868\OneDrive\Document\PlatformIO\Projects\SmartFarm_ESP32\KQ\z7317676608953_bfae139fd94f8d941d71727e267e0671.jpg"
+"C:\Users\84868\OneDrive\Document\PlatformIO\Projects\SmartFarm_ESP32\KQ\z7317676609056_11ab726f44ccb7a769317e40d15045bc.jpg"
+"C:\Users\84868\OneDrive\Document\PlatformIO\Projects\SmartFarm_ESP32\KQ\z7317676609548_dfcb019ec083bf43ceabe0b4550532dc.jpg")
 
 * **Giao diện Dashboard – môi trường & thiết bị**
 
