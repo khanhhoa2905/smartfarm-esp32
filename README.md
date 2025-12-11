@@ -502,6 +502,7 @@ flowchart TD
 
 ## 9. Hình ảnh & video minh hoạ
 
+
 * ## 🖼️ Sơ đồ phần cứng
 ![Hardware schematic](./KQ/sodophancung.jpg)
 
@@ -554,6 +555,6 @@ Trong tương lai có thể mở rộng:
 * Môn học: *IoT Apps Dev*
 * Giảng viên hướng dẫn: *TS. Nguyen Anh Tuan*
 * Liên hệ: *ngokhanhhoa_t67@hus.edu.vn*
-
+![File schematic](./KQ/SmartFarm.fzz)
 Video demo kết quả
 *https://www.youtube.com/watch?si=gxS6UQZpydUrsvZz&v=JBjc2BafbaU&feature=youtu.be*
