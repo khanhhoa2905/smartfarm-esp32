@@ -1,0 +1,554 @@
+
+# 🌱 SmartFarm ESP32 – Hệ thống nông trại thông minh IoT
+
+> Giám sát môi trường – tưới tiêu – thông gió – phát hiện cháy – cảnh báo Email/Telegram  
+> Sử dụng **ESP32 + MQTT (EMQX) + Node-RED Dashboard**
+
+---
+
+## 1. Giới thiệu & Đặt vấn đề
+
+Trong các mô hình nông nghiệp hiện đại, việc **giám sát và điều khiển môi trường** (nhiệt độ, độ ẩm, độ ẩm đất, chất lượng không khí, mực nước…) thường được thực hiện thủ công, phụ thuộc vào kinh nghiệm người vận hành. Điều này dễ dẫn tới:
+
+- Tưới nước không hợp lý → lãng phí nước, cây bị úng hoặc khô.
+- Không phát hiện kịp thời khi **cháy**, **rò rỉ khí độc**, thiếu nước trong bể chứa.
+- Không có dữ liệu **ghi log** để phân tích, tối ưu trong dài hạn.
+
+Dự án **SmartFarm ESP32** hướng tới một hệ thống **tự động hoàn toàn**:
+
+- Đọc dữ liệu từ nhiều loại cảm biến.
+- Ra quyết định điều khiển bơm, quạt, đèn, còi, servo một cách **tự động** theo kịch bản.
+- Gửi dữ liệu thời gian thực lên **EMQX (MQTT broker)**.
+- Hiển thị dashboard đẹp mắt với **Node-RED Dashboard**.
+- Ghi log file CSV để phân tích.
+- Gửi **cảnh báo tức thời** và **báo cáo định kỳ** qua **Email + Telegram Bot**.
+
+Hệ thống này có thể triển khai cho:
+- Mô hình nông trại nhỏ, nhà kính, vườn rau ban công.
+- Mô phỏng – demo cho môn học **Internet of Things**, **Hệ thống nhúng**, **Mạng cảm biến**…
+
+---
+
+## 2. Chức năng chính
+
+### 2.1. Giám sát môi trường
+
+ESP32 đọc dữ liệu từ các cảm biến:
+
+- **DHT11** – nhiệt độ & độ ẩm không khí.
+- **Cảm biến độ ẩm đất** – analog (0–4095) được chuyển sang % độ ẩm.
+- **MQ135** – chất lượng không khí / khí gas → quy đổi % mức cảnh báo.
+- **Cảm biến lửa (flame sensor)** – phát hiện lửa (active LOW).
+- **PIR** – cảm biến chuyển động người.
+- **Module ánh sáng (LDR)** – phát hiện sáng/tối (ngõ ra số).
+- **Cảm biến siêu âm** – đo mực nước trong bể (chuyển sang % dung tích).
+- **RFID RC522** – kiểm soát ra vào (thẻ hợp lệ / không hợp lệ).
+
+Dữ liệu được đóng gói JSON và publish lên topic:
+
+```text
+smartfarm/data
+````
+
+có dạng:
+
+```json
+{
+  "temperature": 25.5,
+  "humidity": 60.2,
+  "soil": 1350,
+  "gas": 180,
+  "fire": false,
+  "motion": true,
+  "light": false,
+  "waterPercent": 61.2,
+  "led": 1,
+  "pump": 0,
+  "fan": 1,
+  "uid": "D062C25F"
+}
+```
+
+### 2.2. Điều khiển tự động
+
+Thuật toán điều khiển (chạy trên ESP32):
+
+* **Phát hiện cháy**
+
+  * `fire == true` (cảm biến lửa active LOW):
+
+    * Bật **còi** (buzzer).
+    * Bật **bơm** phun nước chữa cháy.
+    * Dừng chuyển động **servo** (cảm biến lửa dừng ở vị trí phát hiện).
+    * Gửi cảnh báo lên MQTT (`smartfarm/alert`).
+  * Khi không còn cháy:
+
+    * Tắt còi, tắt bơm.
+    * Servo tiếp tục quét.
+
+* **Tưới nước tự động**
+
+  * Đất **khô** (ví dụ `soil% < 30`) và bể nước **còn đủ** (`water% > 20`):
+
+    * Bật **bơm** tưới.
+  * Đất đủ ẩm hoặc nước thấp:
+
+    * Tắt bơm, nếu nước < 20% thì gửi cảnh báo “Water tank low”.
+
+* **Thông gió / hút khí**
+
+  * Mức gas từ MQ135 > ngưỡng (ví dụ `gas% > 70`) **hoặc**
+  * Nhiệt độ > 35°C **và** có người trong khu vực:
+
+    * Bật **quạt**.
+  * Ngược lại tắt quạt.
+
+* **Chiếu sáng**
+
+  * Có người (PIR = true) **và** trời tối (LDR = tối):
+
+    * Bật **đèn**.
+  * Nếu không có người hoặc trời sáng:
+
+    * Tắt đèn.
+
+* **RFID ra/vào**
+
+  * Đọc UID thẻ:
+
+    * Nếu thuộc danh sách **thẻ hợp lệ** → ghi log “Access OK”, servo hoạt động bình thường.
+    * Nếu là thẻ lạ → ghi log “Access Denied”.
+    * UID (hoặc trạng thái OK/Denied) được gửi kèm trong JSON để hiển thị về sau.
+
+* **Servo quét vùng lửa**
+
+  * Servo SG90 quay qua lại 0–180 độ.
+  * Khi phát hiện lửa: dừng ở vị trí hiện tại (mô phỏng hướng phun nước).
+  * Khi hết lửa: tiếp tục quét qua lại.
+
+### 2.3. Dashboard Node-RED
+
+* **Tab 1 – SmartFarm Dashboard**
+
+  * Nhóm **Environment Sensors**: 5 gauge (nhiệt độ, độ ẩm, độ ẩm đất %, gas %, mực nước %).
+  * Nhóm **Status**: trạng thái Fire / Motion / Light.
+  * Nhóm **Devices**: hiển thị trạng thái LED, Pump, Fan, Fire, Motion, Light.
+
+* **Tab 2 – SmartFarm Charts**
+
+  * 5 đồ thị thời gian thực:
+
+    * Nhiệt độ (°C)
+    * Độ ẩm không khí (%)
+    * Độ ẩm đất (%)
+    * Gas (%)
+    * Mực nước bể (%)
+
+* **Ghi log CSV** trên PC:
+
+  * Mỗi bản tin dữ liệu sẽ được nối vào file `smartfarm_log.csv` để phân tích sau.
+
+### 2.4. Cảnh báo Email & Telegram
+
+Flow **SmartFarm Alerts** có 2 chế độ:
+
+1. **Tự động (10 phút/lần)**
+   Một node `inject` định kỳ 600s lấy dữ liệu mới nhất và gửi **báo cáo tổng quan**:
+
+   * Thời gian, nhiệt độ, độ ẩm, gas %, soil %, water %.
+   * Gửi cùng lúc **Email** và **Telegram Bot**.
+
+2. **Thủ công**
+   Nút `📤 Send report now` trên tab **SmartFarm Alerts**:
+
+   * Bấm để gửi ngay báo cáo với các thông số hiện tại.
+
+Ngoài ra, **cảnh báo tức thời** được kích hoạt khi:
+
+* Có lửa.
+* Gas > ngưỡng.
+* Mực nước < 20%.
+* Độ ẩm đất < 30%.
+
+→ Hệ thống tạo message `SmartFarm ALERT` và gửi đồng thời qua Email + Telegram.
+
+---
+
+## 3. Kiến trúc hệ thống
+
+### 3.1. Sơ đồ khối tổng quan
+
+```mermaid
+flowchart LR
+    subgraph Field["Khu vực nông trại"]
+        DHT["DHT11<br/>Temp/Humidity"]
+        SOIL["Cảm biến ẩm đất"]
+        GAS["MQ135<br/>Gas/Air quality"]
+        FIRE["Cảm biến lửa"]
+        PIR["Cảm biến chuyển động PIR"]
+        LDR["Cảm biến ánh sáng"]
+        US["Cảm biến siêu âm<br/>mực nước"]
+        RFID["RFID RC522"]
+        LED["Đèn LED"]
+        PUMP["Bơm 5V"]
+        FAN["Quạt 5V"]
+        BUZ["Còi báo"]
+        SERVO["Servo SG90"]
+    end
+
+    subgraph Node["ESP32 Firmware (PlatformIO)"]
+        SENS["Module sensors.cpp<br/>đọc & xử lý cảm biến"]
+        ACT["Module actuators.cpp<br/>điều khiển LED/Pump/Fan/Buzzer/Servo"]
+        AUTO["automation.cpp<br/>luật điều khiển tự động"]
+        WIFI["wifi_mqtt.cpp<br/>WiFi + MQTT TLS"]
+        RFIDM["rfid.cpp<br/>đọc UID thẻ"]
+    end
+
+    subgraph Cloud["EMQX Cloud<br/>MQTT Broker"]
+        TOPIC["Topic smartfarm/data<br/>smartfarm/alert"]
+    end
+
+    subgraph PC["PC / Server"]
+        NR["Node-RED<br/>Flows + Dashboard"]
+        CSV["File CSV log"]
+        EMAIL["Email server"]
+        TG["Telegram Bot API"]
+    end
+
+    DHT --> SENS
+    SOIL --> SENS
+    GAS --> SENS
+    FIRE --> SENS
+    PIR --> SENS
+    LDR --> SENS
+    US --> SENS
+    RFID --> RFIDM
+
+    SENS --> AUTO
+    RFIDM --> AUTO
+    AUTO --> ACT
+
+    ACT --> LED
+    ACT --> PUMP
+    ACT --> FAN
+    ACT --> BUZ
+    ACT --> SERVO
+
+    WIFI <-.-> Cloud
+    Cloud <-.-> NR
+    NR --> CSV
+    NR --> EMAIL
+    NR --> TG
+```
+
+---
+
+## 4. Phần cứng sử dụng
+
+> **Lưu ý:** chân GPIO có thể thay đổi theo board của bạn.
+> Xem lại file `firmware/src/sensors.h` và `firmware/src/actuators.h` trong repo để biết cấu hình chính xác.
+
+| Nhóm                | Thiết bị                   | Mô tả                           | Kết nối (ví dụ)                                        |
+| ------------------- | -------------------------- | ------------------------------- | ------------------------------------------------------ |
+| MCU                 | ESP32 DevKit V1 (WROOM-32) | WiFi, nhiều chân analog/digital | USB + các chân GPIO                                    |
+| Cảm biến môi trường | DHT11                      | Nhiệt độ, độ ẩm                 | Data → GPIO 4                                          |
+|                     | Cảm biến ẩm đất analog     | Độ ẩm đất                       | AO → GPIO 34 (ADC)                                     |
+|                     | MQ135                      | Gas / chất lượng không khí      | AO → GPIO 35 (ADC)                                     |
+|                     | Cảm biến lửa               | Phát hiện lửa (active LOW)      | DO → GPIO 32                                           |
+|                     | PIR                        | Phát hiện người                 | DO → GPIO 27                                           |
+|                     | LDR module                 | Phát hiện sáng/tối              | DO → GPIO 14                                           |
+|                     | HC-SR04                    | Đo mực nước                     | Trig → GPIO 25, Echo → GPIO 26                         |
+| Nhận dạng           | RC522 RFID                 | Đọc UID thẻ                     | SDA → GPIO 5, SCK → 18, MOSI → 23, MISO → 19, RST → 22 |
+| Thực thi            | LED                        | Mô phỏng đèn chiếu sáng         | GPIO 2 (on-board LED)                                  |
+|                     | Bơm 5V                     | Tưới nước / chữa cháy           | Qua relay 5V IN1 → GPIO 16 (ví dụ)                     |
+|                     | Quạt 5V                    | Thông gió / hút khí             | Qua relay 5V IN2 → GPIO 21 (ví dụ)                     |
+|                     | Còi buzzer                 | Cảnh báo cháy / RFID            | GPIO 33                                                |
+|                     | Servo SG90                 | Quét vùng phát hiện lửa         | GPIO 13 (PWM)                                          |
+| Nguồn & giao tiếp   | Relay 2 kênh 5V            | Điều khiển quạt + bơm           | VCC 5V, JD-VCC 5V, opto cách ly                        |
+|                     | Nguồn 5V                   | Cấp cho quạt, bơm, servo, relay | 5V/2A trở lên                                          |
+
+---
+
+## 5. Cấu trúc thư mục repo
+
+```text
+.
+├── firmware/              # Mã nguồn ESP32 (PlatformIO)
+│   ├── src/
+│   │   ├── main.cpp
+│   │   ├── sensors.cpp / sensors.h
+│   │   ├── actuators.cpp / actuators.h
+│   │   ├── automation.cpp / automation.h
+│   │   ├── wifi_mqtt.cpp / wifi_mqtt.h
+│   │   └── rfid.cpp / rfid.h
+│   ├── include/
+│   ├── data/
+│   │   └── ca.crt         # file CA certificate cho EMQX TLS
+│   └── platformio.ini
+│
+├── nodered/
+│   ├── smartfarm_dashboard_flow.json   # flow dashboard + charts
+│   └── smartfarm_alerts_flow.json      # flow email + telegram
+│
+├── docs/
+│   ├── hardware_schematic.png          # sơ đồ đấu nối
+│   ├── dashboard_overview.png          # ảnh màn hình dashboard
+│   ├── charts_overview.png             # ảnh tab charts
+│   └── video_demo.mp4                  # (tùy chọn) video demo
+│
+└── README.md
+```
+
+---
+
+## 6. Cài đặt & triển khai
+
+### 6.1. Firmware ESP32 (PlatformIO)
+
+1. Cài **VSCode** + extension **PlatformIO**.
+
+2. Clone repo:
+
+   ```bash
+   git clone https://github.com/ngokhanhhoa2905/smartfarm-esp32.git
+   cd smartfarm-esp32/firmware
+   ```
+
+3. Mở thư mục `firmware` bằng VSCode → PlatformIO sẽ tự nhận project.
+
+4. Sửa file cấu hình WiFi & MQTT (ví dụ trong `wifi_mqtt.h`):
+
+   ```cpp
+   const char* WIFI_SSID = "YourWiFi";
+   const char* WIFI_PASS = "YourPassword";
+
+   const char* mqtt_server = "rf51c8c2.ala.asia-southeast1.emqxsl.com";
+   const int   mqtt_port   = 8883;   // TLS
+   const char* mqtt_user   = "SmartFarm_ESP32";
+   const char* mqtt_pass   = "12345678";
+   ```
+
+5. Copy file **CA certificate** (`ca.crt`) của EMQX vào thư mục `firmware/data/` (như đã làm).
+
+6. Upload SPIFFS chứa CA:
+
+   * Mở Terminal PlatformIO → Run task: **Upload File System Image**.
+
+7. Nạp firmware:
+
+   * **Upload** (build + flash)
+   * Mở **Serial Monitor** 115200 để kiểm tra:
+
+     * `CA certificate loaded successfully.`
+     * `WiFi connected!`
+     * `Connecting to MQTT... connected!`
+     * `Published heartbeat` + các JSON data.
+
+### 6.2. EMQX Cloud
+
+* Tạo deployment EMQX Cloud (free).
+* Bật **Authentication** dạng User/Password, tạo user `SmartFarm_ESP32`.
+* Ghi lại:
+
+  * `Address` (host).
+  * `MQTT over TLS/SSL Port` (8883).
+  * CA certificate để dùng cho ESP32.
+* Không cần cấu hình thêm topic (dùng mặc định).
+
+### 6.3. Node-RED + Dashboard
+
+1. Cài Node-RED (npm hoặc Docker).
+
+2. Cài thêm các node cần thiết:
+
+   ```bash
+   cd ~/.node-red
+   npm install node-red-dashboard
+   npm install node-red-contrib-telegrambot
+   ```
+
+3. Khởi động Node-RED, vào giao diện web (mặc định `http://127.0.0.1:1880`).
+
+4. Import flow dashboard:
+
+   * Menu → Import → Clipboard
+   * Dán nội dung file `nodered/smartfarm_dashboard_flow.json`
+   * Sửa node **MQTT broker** trỏ về EMQX (giống ESP32)
+   * Deploy.
+
+5. Import flow alert:
+
+   * Menu → Import → Clipboard
+   * Dán `nodered/smartfarm_alerts_flow.json`
+   * Cấu hình:
+
+     * Node **Email** với tài khoản SMTP (ví dụ Gmail App Password).
+     * Node **Telegram bot** với bot token và chatId của bạn.
+   * Deploy.
+
+6. Mở Dashboard:
+
+   * `http://127.0.0.1:1880/ui`
+   * Tab **SmartFarm Dashboard** & **SmartFarm Charts** & **SmartFarm Alerts**.
+
+---
+
+## 7. Lưu đồ thuật toán
+
+### 7.1. Lưu đồ tổng quát vòng lặp ESP32
+
+```mermaid
+flowchart TD
+    A[Start] --> B[Khởi tạo Serial]
+    B --> C[initActuators()]
+    C --> D[initSensors()]
+    D --> E[initRFID()]
+    E --> F[initWifiMQTT()]
+    F --> G{Kết nối WiFi & MQTT OK?}
+    G -- No --> F
+    G -- Yes --> H[Main loop]
+
+    H --> I[ mqttLoop() ]
+    I --> J[ readSensors() ]
+    J --> K[ checkRFID() ]
+    K --> L[ runAutomation(data, cardUID) ]
+    L --> M{Đến chu kỳ gửi dữ liệu?}
+    M -- No --> I
+    M -- Yes --> N[Đóng gói JSON (data + trạng thái)]
+    N --> O[mqttPublish smartfarm/data]
+    O --> I
+```
+
+### 7.2. Lưu đồ điều khiển tự động (rút gọn)
+
+```mermaid
+flowchart TD
+    A[Nhận SensorData d, cardUID] --> B{fire == true ?}
+    B -- Yes --> B1[Bật còi, bật bơm, dừng servo]
+    B1 --> B2[Publish 'Fire detected']
+    B2 --> C
+    B -- No --> B3[Tắt còi, tắt bơm, servo tiếp tục quét]
+    B3 --> C
+
+    C{gas% > ngưỡng OR (temp > 35 & motion)} --> C1[Bật quạt] --> D
+    C -- No --> C2[Tắt quạt] --> D
+
+    D{soil% < 30 AND water% > 20} --> D1[Bật bơm tưới] --> E
+    D -- No --> D2[Tắt bơm] --> E
+
+    E{motion == true AND light == tối} --> E1[Bật đèn] --> F
+    E -- No --> E2[Tắt đèn] --> F
+
+    F{cardUID != "" ?} -->|Yes| F1[Kiểm tra UID hợp lệ?]
+    F1 -- Hợp lệ --> F2[Log: Access OK]
+    F1 -- Sai --> F3[Log: Access Denied]
+    F2 --> G[Hoàn thành vòng lặp]
+    F3 --> G
+    F -- No --> G
+```
+
+---
+
+## 8. Hướng dẫn sử dụng
+
+1. **Bật nguồn hệ thống:**
+
+   * ESP32 khởi động, kết nối WiFi & MQTT.
+   * Relay, bơm, quạt ở trạng thái an toàn (tắt).
+
+2. **Mở Node-RED Dashboard:**
+
+   * `SmartFarm Dashboard`:
+
+     * Quan sát các gauge môi trường thay đổi theo thời gian thực.
+     * Kiểm tra trạng thái Fire / Motion / Light.
+   * `SmartFarm Charts`:
+
+     * Theo dõi lịch sử gần nhất của 5 thông số chính.
+   * `SmartFarm Alerts`:
+
+     * Xem **Last sent message**.
+     * Bấm `📤 Send report now` để gửi báo cáo thủ công.
+
+3. **Test các kịch bản:**
+
+   * **Tưới nước**:
+
+     * Làm khô cảm biến đất → soil% giảm → bơm bật (nếu water% đủ).
+   * **Thiếu nước bể**:
+
+     * Hạ mực nước (siêu âm) → water% < 20 → tắt bơm + cảnh báo.
+   * **Gas cao**:
+
+     * Dùng khói nhẹ / mô phỏng → gas% tăng → quạt bật.
+   * **Cháy**:
+
+     * Hơ lửa nhỏ vào cảm biến lửa → còi kêu, bơm bật, servo dừng, cảnh báo gửi ngay.
+   * **Người ra vào**:
+
+     * Đi ngang PIR khi trời tối → đèn LED bật.
+   * **RFID**:
+
+     * Quẹt thẻ đúng/sai → kiểm tra log rfid và hành vi còi (nếu có).
+
+---
+
+## 9. Hình ảnh & video minh hoạ
+
+> Thay thế các đường dẫn bằng file thực tế của bạn trong thư mục `docs/`.
+
+* **Sơ đồ đấu nối phần cứng**
+
+  ![Hardware schematic](docs/hardware_schematic.png)
+
+* **Giao diện Dashboard – môi trường & thiết bị**
+
+  ![Dashboard overview](docs/dashboard_overview.png)
+
+* **Tab Charts – các đồ thị thời gian thực**
+
+  ![Charts overview](docs/charts_overview.png)
+
+* **Video demo hệ thống:**
+
+  [▶ Xem video demo](docs/video_demo.mp4)
+
+---
+
+## 10. Kết luận & Hướng phát triển
+
+### 10.1. Kết luận
+
+Dự án **SmartFarm ESP32** đã hiện thực:
+
+* Một hệ thống **IoT nông nghiệp thông minh**,
+* Sử dụng nhiều loại cảm biến, liên kết qua **MQTT Cloud**,
+* Có **dashboard trực quan** để quan sát và ghi log,
+* Đồng thời tích hợp **cảnh báo đa kênh (Email + Telegram)**.
+
+Hệ thống đáp ứng tốt yêu cầu của bài tập lớn / đồ án cuối kỳ:
+
+* Có tính ứng dụng thực tế vào mô hình nông trại nhỏ / nhà kính.
+* Mã nguồn chia module rõ ràng (`sensors`, `actuators`, `automation`, `wifi_mqtt`, `rfid`).
+* Tài liệu hoá đầy đủ: sơ đồ, hình ảnh, lưu đồ, hướng dẫn cài đặt.
+
+### 10.2. Hướng phát triển
+
+Trong tương lai có thể mở rộng:
+
+* Tích hợp **cơ sở dữ liệu (InfluxDB, MongoDB, …)** để lưu trữ dài hạn.
+* Dùng **Grafana** hoặc giao diện web riêng để trực quan hoá nâng cao.
+* Thêm thuật toán **tối ưu tưới** dựa trên dự báo thời tiết, lịch sử độ ẩm.
+* Bổ sung **AI/ML nhỏ** dự đoán sâu bệnh hoặc phát hiện bất thường.
+* Hỗ trợ cấu hình tham số (ngưỡng soil%, gas%, nhiệt độ…) trực tiếp từ dashboard.
+
+---
+
+## 11. Thông tin tác giả
+
+* Họ tên: *Ngo Khanh Hoa*
+* Môn học: *IoT Apps Dev*
+* Giảng viên hướng dẫn: *TS. Nguyen Anh Tuan*
+* Liên hệ: *ngokhanhhoa_t67@hus.edu.vn*
+
+---

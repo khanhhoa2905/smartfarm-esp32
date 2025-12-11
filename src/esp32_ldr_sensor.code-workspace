@@ -1,0 +1,24 @@
+{
+	"folders": [
+		{
+			"path": "../../esp32_ldr_sensor"
+		},
+		{
+			"name": "SmartFarm_ESP32",
+			"path": ".."
+		}
+	],
+	"settings": {
+		"vscode-corda.isCordaProject": false,
+		"python.languageServer": "Pylance",
+		"gitlens.currentLine.enabled": false,
+		"gitlens.hovers.enabled": false,
+		"gitlens.hovers.currentLine.over": "line",
+		"gitlens.codeLens.enabled": false,
+		"gitlens.defaultDateStyle": "absolute",
+		"tabnine.experimentalAutoImports": true,
+		"vsintellicode.sql.completionsEnabled": false,
+		"githubIssues.issueBranchTitle": "feature/${issueNumber}_${sanitizedIssueTitle}",
+		"errorLens.messageEnabled": false
+	}
+}
