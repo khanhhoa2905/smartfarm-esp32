@@ -39,8 +39,7 @@ SensorData readSensors() {
   
   d.soil = analogRead(SOIL_PIN);
   d.gas = analogRead(MQ135_PIN);
-  d.soilPercent = constrain((1.0 - (float)data.soil / 4095.0) * 100.0, 0, 100);
-data.gasPercent  = constrain(((float)data.gas / 4095.0) * 100.0, 0, 100);
+  
   d.fire = digitalRead(FIRE_PIN);   // HIGH = cháy
   d.motion = digitalRead(PIR_PIN);
   d.light = digitalRead(LDR_PIN);

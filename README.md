@@ -511,6 +511,10 @@ flowchart TD
 
 ## 🖼️ Giao diện Dashboard
 ![Dashboard](./KQ/hethongdashboard.jpg)
+![Dashboard](./KQ/dashboard1.jpg)
+![Dashboard](./KQ/dashboard2.jpg)
+![Dashboard](./KQ/dashboard3.jpg)
+
 
 ## 🖼️ Gửi Telegram
 ![Telegram screenshot](./KQ/telegrambot.jpg)
@@ -555,6 +559,7 @@ Trong tương lai có thể mở rộng:
 * Môn học: *IoT Apps Dev*
 * Giảng viên hướng dẫn: *TS. Nguyen Anh Tuan*
 * Liên hệ: *ngokhanhhoa_t67@hus.edu.vn*
+* 
 ![File schematic](./KQ/SmartFarm.fzz)
 Video demo kết quả
 *https://www.youtube.com/watch?si=gxS6UQZpydUrsvZz&v=JBjc2BafbaU&feature=youtu.be*
